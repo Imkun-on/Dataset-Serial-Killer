@@ -1,0 +1,14 @@
+missing_values = killers.isna().sum()
+
+print(missing_values)
+
+killers['Country'] = killers['Country'].str.replace('\r\n', ',')
+
+killers['Country'] = killers['Country'].str.split(',')
+
+killers = killers.explode('Country')
+
+killers['Country'] = killers['Country'].str.strip()
+
+stati_unici = killers['Country'].unique()
+print(stati_unici)

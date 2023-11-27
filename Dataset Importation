@@ -1,0 +1,59 @@
+csv_files = [
+    "C:/Users/miane/OneDrive/Desktop/Dataset/Killer/Lessthan_5_victim_count.csv",
+    "C:/Users/miane/OneDrive/Desktop/Dataset/Killer/5_to_14_victim_count.csv",
+    "C:/Users/miane/OneDrive/Desktop/Dataset/Killer/15_to_30_victim_count.csv",
+    "C:/Users/miane/OneDrive/Desktop/Dataset/Killer/Highest_victim_count.csv"    
+]
+
+
+main_attributes = [
+    "Name",
+    "Country",
+    "Years active",
+    "Proven victims",
+    "Possible victims",
+    "Notes"
+]
+
+def process_serial_killer(row):
+    # Base info
+    serial_killer_info = {attribute: row.get(attribute) for attribute in main_attributes}
+
+
+
+    return serial_killer_info
+
+
+all_serial_killers_data = []
+for csv_file in csv_files:
+
+    serial_killers_df = pd.read_csv(csv_file)
+
+
+    serial_killers_data = []
+    for _, row in serial_killers_df.iterrows():
+        serial_killer_data = process_serial_killer(row)
+        serial_killers_data.append(serial_killer_data)
+
+
+    columns = ["Name", "Country", "Years active", "Proven victims", "Possible victims", "Notes"]
+    processed_serial_killers_df = pd.DataFrame(serial_killers_data, columns=columns)
+
+
+    processed_serial_killers_df['Proven victims'] = pd.to_numeric(processed_serial_killers_df['Proven victims'], errors='coerce')
+    processed_serial_killers_df['Possible victims'] = pd.to_numeric(processed_serial_killers_df['Possible victims'], errors='coerce')
+
+
+    processed_serial_killers_df[['Proven victims', 'Possible victims']] = processed_serial_killers_df[['Proven victims', 'Possible victims']].fillna(0)
+
+
+    output_csv_file = os.path.join("processed", f"processed_{os.path.basename(csv_file)}")
+    processed_serial_killers_df.to_csv(output_csv_file, index=False)
+
+
+    all_serial_killers_data.extend(serial_killers_data)
+
+all_serial_killers_df = pd.DataFrame(all_serial_killers_data, columns=columns)
+all_serial_killers_df.to_csv("all_serial_killers.csv", index=False)
+
+killers = pd.read_csv("all_serial_killers.csv")

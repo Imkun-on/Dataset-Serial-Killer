@@ -1,4 +1,4 @@
-# Quale stato possiede più serial killer?
+#Quale stato possiede più serial killer?
 country_killer = killers['Country'].value_counts().reset_index()
 country_killer.columns = ['Country', 'Number of Killers']
 

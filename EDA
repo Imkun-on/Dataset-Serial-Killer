@@ -1,0 +1,540 @@
+#Quale stato possiede più serial killer?
+country_killer = killers['Country'].value_counts().reset_index()
+country_killer.columns = ['Country', 'Number of Killers']
+
+fig = px.choropleth(country_killer,
+                    locations='Country',
+                    locationmode='country names',
+                    color='Number of Killers',
+                    color_continuous_scale='Viridis',
+                    range_color=[0, country_killer['Number of Killers'].max()],
+                    hover_name='Country',
+                    title='Countries with highest serial killers',
+                    height=800, width=1000)
+
+fig.update_layout(title_x=0.5,
+                  geo=dict(projection_scale=1.2),
+                  margin=dict(b=50, t=50, pad=4),
+                  coloraxis_colorbar=dict(title='Number of Serial Killers',
+                                          tickprefix='',
+                                          ticksuffix=''))
+
+fig.show()
+
+#Dove sono stati commessi più omicidi dai serial killer?
+def extract_numeric_value(interval_str):
+    numbers = [int(num) for num in re.findall(r'\d+', str(interval_str))]
+    return sum(numbers) / len(numbers) if numbers else None
+
+killers['Proven victims'] = killers['Proven victims'].apply(extract_numeric_value)
+
+state_victims = killers.groupby('Country', as_index=False)['Proven victims'].sum()
+
+state_victims = state_victims.dropna()
+
+state_victims = state_victims.sort_values('Proven victims', ascending=False)
+
+fig = px.choropleth(state_victims,
+                    locations='Country',
+                    locationmode='country names',
+                    color='Proven victims',  
+                    color_continuous_scale='Viridis',
+                    range_color=[0, state_victims['Proven victims'].max()],
+                    hover_name='Country',
+                    title='Countries with highest serial killers',
+                    height=800, width=1000)
+
+fig.update_layout(title_x=0.5,
+                  geo=dict(projection_scale=1.2),
+                  margin=dict(b=50, t=50, pad=4),
+                  coloraxis_colorbar=dict(title='Number of Proven victims', 
+                                          tickprefix='',
+                                          ticksuffix=''))
+
+fig.show()
+
+#In quale stato i serial killer sono stati accusati di altre possibili vittime? 
+def extract_possible_victims_value(value):
+    if isinstance(value, str):
+        numbers = [int(num) for num in re.findall(r'\d+', value)]
+        return numbers[0] if numbers else None
+    else:
+        return None
+
+killers['Possible victims'] = killers['Possible victims'].apply(extract_possible_victims_value)
+
+killers['Possible victims'].fillna(0, inplace=True)
+
+state_possible_victims = killers.groupby('Country', as_index=False)['Possible victims'].sum()
+
+state_possible_victims = state_possible_victims.sort_values('Possible victims', ascending=False)
+
+fig_possible_victims = px.choropleth(state_possible_victims,
+                                     locations='Country',
+                                     locationmode='country names',
+                                     color='Possible victims', 
+                                     color_continuous_scale='Viridis',
+                                     range_color=[0, state_possible_victims['Possible victims'].max()],
+                                     hover_name='Country',
+                                     title='Countries with highest possible victims',  
+                                     height=800, width=1000)
+
+fig_possible_victims.update_layout(title_x=0.5,
+                                   geo=dict(projection_scale=1.2),
+                                   margin=dict(b=50, t=50, pad=4),
+                                   coloraxis_colorbar=dict(title='Number of Possible victims', 
+                                                           tickprefix='',
+                                                           ticksuffix=''))
+
+fig_possible_victims.show()
+
+#I serial killer con meno anni di attività possono aver commesso più omicidi rispetto a quelli con più anni di attività?
+killers['Years active'] = (
+    killers['Years active']
+    .str.replace(r' and earlier| to present|s|\?|c\.|late ', '', regex=True)
+    .str.replace('30 June 1983', '1983')
+    .str.replace(' to 23 July 1983', ''))
+
+killers = killers.assign(From_Date=np.nan, To_Date=np.nan)
+killers[['From_Date','To_Date']] = killers['Years active'].str.split('to',expand=True)
+killers.From_Date.isna().sum()
+killers.To_Date.fillna(killers.From_Date,inplace=True)
+killers.To_Date.isna().sum()
+killers['To_Date'] = pd.to_numeric(killers['To_Date'], errors='coerce')
+killers['From_Date'] = pd.to_numeric(killers['From_Date'], errors='coerce')
+killers['Active_Years'] = killers.To_Date.values - killers.From_Date.values
+
+killers.Active_Years.replace({0:1}, inplace=True)
+
+killers = killers.drop(['From_Date', 'To_Date'], axis=1)
+
+fig = px.scatter(killers, x='Active_Years', y='Proven victims', color='Country',
+                 size='Proven victims', hover_data=['Name'])
+
+fig.update_layout(xaxis_title='Active Years',
+                  yaxis_title='Number of Proven Victims',
+                  title_text="Number of Proven Victims by Seria Killer during their active years",
+                  legend_title_text='Country',
+                  title_x=0.5,
+                  width=1200,  
+                  height=800)
+
+fig.show()
+
+#Oltre ad aver commesso omicidi di quante altre vittime sospette sono stati accusati i serial killer durante i loro anni di attività? 
+fig = px.scatter(killers, x='Active_Years', y='Possible victims', color='Country',
+                 size='Proven victims', hover_data=['Name'])
+
+fig.update_layout(xaxis_title='Active Years',
+                  yaxis_title='Number of Possible Victims',
+                  title_text="Number of Possible Victims by Seria Killer during their active years",
+                  legend_title_text='Country',
+                  title_x=0.5,
+                  width=1200,  
+                  height=800)
+
+fig.show()
+
+Quale serial killer ha commesso più omicidi e quale ne ha commessi di meno?
+max_victims = killers['Proven victims'].max()
+max_killers = killers[killers['Proven victims'] == max_victims]['Name']
+
+min_victims = killers['Proven victims'].min()
+min_killers = killers[killers['Proven victims'] == min_victims]['Name']
+
+print(f"Serial Killer con il maggior numero di omicidi: {max_killers.tolist()}")
+print(f"Serial Killer con il minor numero di omicidi: {min_killers.tolist()}")
+
+filtered = killers.loc[(killers['Name'] == 'Sharon Kinne') | (killers['Name'] == 'Luis Garavito')]
+filtered_c = filtered[['Name','Country','Active_Years','Proven victims','Possible victims']]	
+
+filtered_c.sort_values(by='Name', ascending=True)
+
+filtered = killers[killers['Proven victims'] <= 3]
+filtered_c = filtered[['Name','Country','Active_Years','Proven victims','Possible victims']]	
+filtered_c.sort_values(by='Name', ascending=True)
+
+Quanti e quali serial killer sono morti in carcere prima della condanna a morte o di scontare la pena? 
+def natural(description):
+    phrases = [
+        "heart attack","heart failure","kidney failure","natural causes","cardiac arrest","AIDS complications","tuberculosis",
+        "health problems","respiratory problems","COVID-19","surgical complications","B-cell lymphomas", "strychnine",
+        "breast cancer","leukemia","cancer","thromboembolism","pneumonia","unspecified"]
+    return any(phrase in description for phrase in phrases)
+
+natural_cases = killers[killers['Notes'].apply(natural)]
+
+def highlight_phrases(text, phrases):
+    for phrase in phrases:
+        text = text.replace(phrase, f'<span style="border-bottom: 2px solid red;">{phrase}</span>')
+    return text
+
+phrases_natural = [
+    "heart attack", "heart failure", "kidney failure", "natural causes", "cardiac arrest", "AIDS complications", 
+    "tuberculosis", "health problems", "respiratory problems", "COVID-19", "surgical complications",
+    "breast cancer", "leukemia", "cancer", "thromboembolism", "pneumonia", "unspecified"
+]
+
+natural_cases_highlighted = natural_cases.copy()
+natural_cases_highlighted['Notes'] = natural_cases_highlighted['Notes'].apply(lambda x: highlight_phrases(x, phrases_natural))
+
+filtered_columns = natural_cases_highlighted[['Name','Country', 'Notes']]
+
+filtered_columns_sorted = filtered_columns.sort_values(by='Name')
+
+HTML(filtered_columns_sorted.to_html(escape=False))
+
+def get_death_cause(description):
+    phrases = [
+        ("heart attack", "Heart Attack"),
+        ("heart failure", "Heart Failure"),
+        ("kidney failure", "Kidney Failure"),
+        ("natural causes", "Natural Causes"),
+        ("cardiac arrest", "Cardiac Arrest"),
+        ("AIDS complications", "AIDS Complications"),
+        ("tuberculosis", "Tuberculosis"),
+        ("health problems", "Health Problems"),
+        ("respiratory problems", "Respiratory Problems"),
+        ("COVID-19", "COVID-19"),
+        ("surgical complications", "Surgical Complications"),
+        ("breast cancer", "Breast Cancer"),
+        ("leukemia", "Leukemia"),
+        ("cancer", "Cancer"),
+        ("thromboembolism", "Thromboembolism"),
+        ("pneumonia", "Pneumonia"),
+        ("unspecified", "Unspecified")
+    ]
+    for phrase, cause in phrases:
+        if phrase in description:
+            return cause
+    return "Unknown"  
+
+killers['Death_Cause'] = killers['Notes'].apply(get_death_cause)
+
+known_death_cases = killers[killers['Death_Cause'] != "Unknown"]
+
+death_cause_counts = known_death_cases['Death_Cause'].value_counts().reset_index()
+death_cause_counts.columns = ['Death Cause', 'Number of Cases']
+
+fig = px.bar(death_cause_counts, x='Death Cause', y='Number of Cases', color='Death Cause')
+
+fig.update_layout(xaxis_title='Death Cause',
+                  yaxis_title='Number of Cases',
+                  title_text="Number of Serial Killers of Specific Causes Mentioned in Notes",
+                  legend_title_text='Natural Causes',
+                  title_x=0.5,
+                  width=1200,  
+                  height=800)
+
+fig.show()
+
+#Quanti serial killer non sono ancora stati identificati?
+def mistery(description):
+    phrases = ["Unidentified", "unsolved", "mysterious murders", "unidentified"]
+    return any(phrase in description for phrase in phrases)
+
+mistery_cases = killers[killers['Notes'].apply(mistery)]
+
+def highlight_phrases(text, phrases):
+    for phrase in phrases:
+        text = text.replace(phrase, f'<span style="border-bottom: 2px solid red;">{phrase}</span>')
+    return text
+
+phrases_mistery = ["Unidentified", "unsolved", "unidentified"]
+
+mistery_cases_highlighted = mistery_cases.copy()
+mistery_cases_highlighted['Notes'] = mistery_cases_highlighted['Notes'].apply(lambda x: highlight_phrases(x, phrases_mistery))
+
+filtered_columns = mistery_cases_highlighted[['Name', 'Country', 'Notes']]
+
+filtered_columns_sorted = filtered_columns.sort_values(by='Name')
+
+HTML(filtered_columns_sorted.to_html(escape=False))
+
+#In che modo sono stati condannati i serial killer?
+def mortal(description):
+    phrases = ["immurement", "firing squad", "lethal injection", "hanging", "hanged", "gunshot", "guillotine", "electric chair"]
+    return any(phrase in description for phrase in phrases)
+
+mortal_cases = killers[killers['Notes'].apply(mortal)]
+
+def highlight_phrases(text, phrases):
+    for phrase in phrases:
+        text = text.replace(phrase, f'<span style="border-bottom: 2px solid red;">{phrase}</span>')
+    return text
+
+phrases_mortal = ["immurement", "firing squad", "lethal injection", "hanging", "hanged", "gunshot", "guillotine", "electric chair"]
+
+mortal_cases_highlighted = mortal_cases.copy()
+mortal_cases_highlighted['Notes'] = mortal_cases_highlighted['Notes'].apply(lambda x: highlight_phrases(x, phrases_mortal))
+
+filtered_columns = mortal_cases_highlighted[['Name','Country','Notes']]
+
+filtered_columns_sorted = filtered_columns.sort_values(by='Name')
+
+HTML(filtered_columns.to_html(escape=False))
+
+def get_execution_method(description):
+    phrases = [
+        ("immurement", "Immurement"),
+        ("firing squad", "Firing Squad"),
+        ("lethal injection", "Lethal Injection"),
+        ("hanging", "Hanging"),
+        ("hanged", "Hanging"),
+        ("gunshot", "Gunshot"),
+        ("guillotine", "Guillotine"),
+        ("electric chair", "Electric Chair")
+    ]
+    for phrase, method in phrases:
+        if phrase in description:
+            return method
+    return "Unknown" 
+
+killers['Execution_Method'] = killers['Notes'].apply(get_execution_method)
+
+known_execution_cases = killers[killers['Execution_Method'] != "Unknown"]
+
+execution_counts = known_execution_cases['Execution_Method'].value_counts().reset_index()
+execution_counts.columns = ['Execution Method', 'Number of Cases']
+
+fig = px.bar(execution_counts, x='Execution Method', y='Number of Cases', color='Execution Method')
+
+fig.update_layout(xaxis_title='Execution Method',
+                  yaxis_title='Number of Cases',
+                  title_text="Number of Serial Killers Executed by Method Mentioned in Notes",
+                  legend_title_text='Execution Method',
+                  title_x=0.5,
+                  width=1200,  
+                  height=800)
+
+fig.show()
+
+#Quali e quanti serial killer sono stati condannati all'ergastolo? 
+def sentenced(description):
+    phrases = ["sentenced to life"]
+    return any(phrase in description for phrase in phrases)
+
+sentenced_cases = killers[killers['Notes'].apply(sentenced)]
+
+def highlight_phrases(text, phrases):
+    for phrase in phrases:
+        text = text.replace(phrase, f'<span style="border-bottom: 2px solid red;">{phrase}</span>')
+    return text
+
+phrases_sentenced = ["sentenced to life", "sentenced to life without parole"]
+
+sentenced_cases_highlighted = sentenced_cases.copy()
+sentenced_cases_highlighted['Notes'] = sentenced_cases_highlighted['Notes'].apply(lambda x: highlight_phrases(x, phrases_sentenced))
+
+filtered_columns = sentenced_cases_highlighted[['Name', 'Notes']]
+
+filtered_columns_sorted = filtered_columns.sort_values(by='Name')
+
+HTML(filtered_columns_sorted.to_html(escape=False))
+
+#Quali serial killer sono stati rilasciati e non dal carcere? 
+def free(description):
+    phrases = ["released"]
+    return any(phrase in description for phrase in phrases)
+
+free_cases = killers[killers['Notes'].apply(free)]
+
+def highlight_phrases(text, phrases):
+    for phrase in phrases:
+        text = text.replace(phrase, f'<span style="border-bottom: 2px solid red;">{phrase}</span>')
+    return text
+
+phrases_free = ["released"]
+
+free_cases_highlighted = free_cases.copy()
+free_cases_highlighted['Notes'] = free_cases_highlighted['Notes'].apply(lambda x: highlight_phrases(x, phrases_free))
+
+filtered_columns_free = free_cases_highlighted[['Name', 'Country', 'Notes']]
+
+filtered_columns_free_sorted = filtered_columns_free.sort_values(by='Name')
+
+HTML(filtered_columns_free_sorted.to_html(escape=False))
+
+#Quali serial killer si sono suicidati o hanno tentanto il suicidio per evitare di scontare la pena? 
+def escape(description):
+    phrases = ["suicide", "himself"]
+    return any(phrase in description for phrase in phrases)
+
+escape_cases = killers[killers['Notes'].apply(escape)]
+
+def highlight_phrases(text, phrases):
+    for phrase in phrases:
+        text = text.replace(phrase, f'<span style="border-bottom: 2px solid red;">{phrase}</span>')
+    return text
+
+phrases_escape = ["suicide", "himself"]
+
+escape_cases_highlighted = escape_cases.copy()
+escape_cases_highlighted['Notes'] = escape_cases_highlighted['Notes'].apply(lambda x: highlight_phrases(x, phrases_escape))
+
+filtered_columns_escape = escape_cases_highlighted[['Name', 'Country', 'Notes']]
+
+filtered_columns_escape_sorted = filtered_columns_escape.sort_values(by='Name')
+
+HTML(filtered_columns_escape_sorted.to_html(escape=False))
+
+#Quale arma hanno utilizzato per uccidere le persone?
+def weapon(description):
+    phrases = ["hammer", "axes", "meat clavers", "shovels", "rifle guns", "rocks", "knife", "acid", "poison", "poisoning"]
+    return any(phrase in description for phrase in phrases)
+
+weapon_cases = killers[killers['Notes'].apply(weapon)]
+
+def highlight_phrases(text, phrases):
+    for phrase in phrases:
+        text = text.replace(phrase, f'<span style="border-bottom: 2px solid red;">{phrase}</span>')
+    return text
+
+phrases_weapon = ["hammer", "axes", "meat clavers", "shovels", "rifle guns", "rocks", "knife", "acid", "poison", "poisoning"]
+
+weapon_cases_highlighted = weapon_cases.copy()
+weapon_cases_highlighted['Notes'] = weapon_cases_highlighted['Notes'].apply(lambda x: highlight_phrases(x, phrases_weapon))
+
+filtered_columns_weapon = weapon_cases_highlighted[['Name', 'Country', 'Notes']]
+
+filtered_columns_weapon_sorted = filtered_columns_weapon.sort_values(by='Name')
+
+HTML(filtered_columns_weapon_sorted.to_html(escape=False))
+
+def get_weapon_type(description):
+    phrases = [
+        ("hammer", "Hammer"),
+        ("hammers", "Hammers"),
+        ("axe", "Axe"),
+        ("axes", "Axes"),
+        ("meat cleavers", "Meat Cleavers"),
+        ("meat cleaver", "Meat Cleaver"),
+        ("shovels", "Shovels"),
+        ("rifle guns", "Rifle Guns"),
+        ("rocks", "Rocks"),
+        ("knife", "Knife"),
+        ("poisoning","Poisoning"),
+        ("acid","Acid")]
+    
+    for phrase, weapon_type in phrases:
+        if phrase in description:
+            return weapon_type
+    return "Unknown" 
+
+killers['Weapon_Type'] = killers['Notes'].apply(get_weapon_type)
+
+known_weapon_cases = killers[killers['Weapon_Type'] != "Unknown"]
+
+weapon_type_counts = known_weapon_cases['Weapon_Type'].value_counts().reset_index()
+weapon_type_counts.columns = ['Weapon Type', 'Number of Cases']
+
+
+fig = px.bar(weapon_type_counts, x='Weapon Type', y='Number of Cases', color='Weapon Type')
+
+fig.update_layout(xaxis_title='Weapon Type',
+                  yaxis_title='Number of Cases',
+                  title_text="Number of Serial Killers with Specific Weapon Types Mentioned in Notes",
+                  legend_title_text='Weapon Type',
+                  title_x=0.5,
+                  width=1200,  
+                  height=800)
+
+fig.show()
+
+#I serial killer venivano soprannominati per il loro modus operandi?
+def known(notes):
+    phrases = ["known", "Known", "Knowns", "knows"]
+    return any(phrase in notes for phrase in phrases)
+
+trap_cases = killers[killers['Notes'].apply(known)]
+
+def highlight_phrases(text, phrases):
+    for phrase in phrases:
+        text = text.replace(phrase, f'<span style="border-bottom: 2px solid red;">{phrase}</span>')
+    return text
+
+phrases_known = ["known", "Known", "Knowns", "knows"]
+
+trap_cases_highlighted = trap_cases.copy()
+trap_cases_highlighted['Notes'] = trap_cases_highlighted['Notes'].apply(lambda x: highlight_phrases(x, phrases_known))
+
+filtered_columns_known = trap_cases_highlighted.sort_values(by='Name')[['Name', 'Country', 'Notes']]
+
+HTML(filtered_columns_known.to_html(escape=False))
+
+#I serial killer avevano perversioni o altri disturbi mentali? 
+def conditions(description):
+    phrases = [
+        "necrophilic", "schizophrenic", "found insane", "epileptic", 
+        "sociopath", "cannibalized", "drank", "blood", "necrophiliac"
+    ]
+    return any(phrase in description for phrase in phrases)
+
+conditions_cases = killers[killers['Notes'].apply(conditions)]
+
+def highlight_phrases(text, phrases):
+    for phrase in phrases:
+        text = text.replace(phrase, f'<span style="border-bottom: 2px solid red;">{phrase}</span>')
+    return text
+
+phrases_conditions = [
+    "necrophilic", "schizophrenic", "found insane", "epileptic", 
+    "sociopath", "cannibalized", "drank", "Cannibal", "blood","necrophiliac"
+]
+
+conditions_cases_highlighted = conditions_cases.copy()
+conditions_cases_highlighted['Notes'] = conditions_cases_highlighted['Notes'].apply(lambda x: highlight_phrases(x, phrases_conditions))
+
+filtered_columns_conditions = conditions_cases_highlighted.sort_values(by='Name')[['Name', 'Country', 'Notes']]
+
+HTML(filtered_columns_conditions.to_html(escape=False))
+
+#Anche i pubblici ufficiali sono stati serial killer per il semplice fatto di avere la sindrome del giustiziere? 
+def officer(notes):
+    phrases = ["constable", "former", "officer", "vigilante", "investigator", "soldier", "security guard", "Military instructor"]
+    return any(phrase in notes for phrase in phrases)
+
+officer_cases = killers[killers['Notes'].apply(officer)]
+
+def highlight_phrases(text, phrases):
+    for phrase in phrases:
+        text = text.replace(phrase, f'<span style="border-bottom: 2px solid red;">{phrase}</span>')
+    return text
+
+phrases_officer = ["constable", "former", "officer", "vigilante", "investigator", "soldier", "security guard", "Military instructor"]
+
+officer_cases_highlighted = officer_cases.copy()
+officer_cases_highlighted['Notes'] = officer_cases_highlighted['Notes'].apply(lambda x: highlight_phrases(x, phrases_officer))
+
+officer_cases_sorted = officer_cases_highlighted.sort_values(by='Name')
+
+HTML(officer_cases_sorted[['Name', 'Country', 'Notes']].to_html(escape=False))
+
+#Ci sono state persone che ricoprivano altri ruoli ad essere serial killer?
+def occupation(description):
+    phrases = [
+        "truck painter", "gang leader", "domestic servant", "female wrestler", 
+        "homeless cannibal", "seamstress", "transient baby-sitter", "shooter", 
+        "politician", "nursing assistant", "clergyman"
+    ]
+    return any(phrase in description for phrase in phrases)
+
+occupation_cases = killers[killers['Notes'].apply(occupation)]
+
+def highlight_phrases(text, phrases):
+    for phrase in phrases:
+        text = text.replace(phrase, f'<span style="border-bottom: 2px solid red;">{phrase}</span>')
+    return text
+
+phrases_occupation = [
+    "truck painter", "gang leader", "domestic servant", "female wrestler", 
+    "homeless cannibal", "seamstress", "transient baby-sitter", "shooter", 
+    "politician", "nursing assistant", "clergyman"
+]
+
+occupation_cases_highlighted = occupation_cases.copy()
+occupation_cases_highlighted['Notes'] = occupation_cases_highlighted['Notes'].apply(lambda x: highlight_phrases(x, phrases_occupation))
+
+filtered_columns_occupation_sorted = occupation_cases_highlighted.sort_values(by='Name')
+
+HTML(filtered_columns_occupation_sorted[['Name', 'Country', 'Notes']].to_html(escape=False))
